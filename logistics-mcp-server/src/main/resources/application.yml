@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: logistics-mcp-server
+  ai:
+    mcp:
+      server:
+        name: logistics-mcp-server
+        version: 0.0.1
+        protocol: STREAMABLE

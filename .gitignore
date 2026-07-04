@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# Java / Maven
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# Logs
+*.log
+
+# IDEs
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+
+# VS Code workspace settings
+.vscode/

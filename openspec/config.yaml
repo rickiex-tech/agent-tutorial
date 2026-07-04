@@ -1,0 +1,85 @@
+schema: spec-driven
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+# Example:
+#   context: |
+#     Tech stack: TypeScript, React, Node.js
+#     We use conventional commits
+#     Domain: e-commerce platform
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+context: |
+  技术栈：
+  - Spring Boot 4.0.5
+  - Spring AI 2.0
+  - MySQL 8.0
+  - Redis 7.0
+  - MyBatis 3.x
+  - Java 21
+  - Maven
+
+  架构规范：
+  - Controller → Service → Mapper 三层架构
+  - RESTful API 设计风格, JSON 响应
+  - 统一响应格式 Result（code, message, data）
+  - 使用 Lombok 简化实体类
+
+  数据库规范：
+  - 表名使用小写蛇形命名（如 user_info）
+  - 字段名使用小写蛇形命名（如 create_time）
+  - MyBatis 配置 mapUnderscoreToCamelCase: true 自动映射
+  - 每张表必须有 id（BIGINT AUTO_INCREMENT）、create_time、update_time 字段
+
+  代码规范：
+  - 接口命名：I{功能名}Service
+  - 实现类命名：{功能名}ServiceImpl
+  - Mapper 接口命名：{实体名}Mapper
+  - 使用 @MapperScan 扫描 mapper 包
+  - 统一异常处理使用 @RestControllerAdvice
+
+  API 规范：
+  - 路径前缀：/api/{version}（如 /api/v1）
+  - GET：查询
+  - POST：创建
+  - PUT：全量更新
+  - PATCH：部分更新
+  - DELETE：删除
+  - 分页参数：page（默认1）、size（默认20）
+
+rules:
+  proposal:
+    - 必须包含：为什么做（Why）、要改什么（What）、影响范围（Impact）
+    - 必须列出受影响的 API 端点
+    - 必须说明数据库变更（DDL/DML）
+    - 必须评估对现有功能的影响
+
+  specs:
+    - 使用 ADDED/MODIFIED/REMOVED 标记需求变更类型
+    - 每个需求至少包含一个场景（Scenario）
+    - 场景格式：GIVEN...WHEN...THEN...
+    - 必须覆盖正常路径和异常路径
+
+  design:
+    - 包含技术决策及理由
+    - 包含数据库表结构设计（ER 图或表结构描述）
+    - 包含 API 接口定义（请求/响应格式）
+    - 包含异常处理策略
+    - 复杂流程包含序列图
+    - 可选：包含性能考量
+
+  tasks:
+    - 按实施顺序组织任务
+    - 每个任务控制在 2-4 小时内可完成
+    - 任务粒度：可独立验证的功能单元
+    - 标注任务依赖关系

@@ -1,0 +1,32 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: logistics-agent
+  ai:
+    # 通义千问 —— OpenAI 兼容模式
+    openai:
+      # Spring AI 2.0 使用官方 openai-java SDK，仅在 base-url 后拼接 /chat/completions，故 base-url 须自带 /v1
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api-key: ${DASHSCOPE_API_KEY:}
+      chat:
+        model: qwen-plus
+        temperature: 0.1
+    # MCP Client —— 经 Streamable HTTP 连接 logistics-mcp-server（SSE 传输在 2.0 已弃用）
+    mcp:
+      client:
+        name: logistics-agent
+        version: 0.0.1
+        type: SYNC
+        request-timeout: 30s
+        streamable-http:
+          connections:
+            logistics-server:
+              url: http://localhost:8080
+        toolcallback:
+          enabled: true
+
+logging:
+  level:
+    "[org.springframework.ai]": INFO

@@ -1,0 +1,45 @@
+### logistics-agent 测试请求
+### 前置：1) 启动 logistics-mcp-server (8080)  2) 设置 DASHSCOPE_API_KEY 并启动 logistics-agent (8081)
+### 用法：安装 VS Code "REST Client" 扩展，点击各请求上方的 "Send Request"
+
+@host = http://localhost:8081
+
+### 1) 成功：用户 1001 + 运单 9001 → 创建工单成功，返回工单号
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "message": "用户1001的运单9001破损了，帮我创建一个客服工单，内容是包裹外箱破损"
+}
+
+### 2) 业务失败：运单 9999 不存在 → 解释并引导核对，不重试
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "message": "用户1001的运单9999要投诉，帮我建工单"
+}
+
+### 3) 系统失败（查询用户）：用户 1500 上游不可用 → "系统繁忙，请稍后重试"
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "message": "用户1500的运单9001有问题，帮我建工单"
+}
+
+### 4) 系统失败（创建工单）：用户 1002 工单服务故障 → "系统繁忙，请稍后重试"
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "message": "用户1002的运单9002延误，帮我建工单"
+}
+
+### 5) 纯查询：查运单状态（不创建工单）
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "message": "帮我查一下用户1001的运单9001现在到哪了"
+}
