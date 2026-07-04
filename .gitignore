@@ -20,3 +20,6 @@ target/
 
 # VS Code workspace settings
 .vscode/
+
+# Copilot worktrees
+copilot-worktrees/
