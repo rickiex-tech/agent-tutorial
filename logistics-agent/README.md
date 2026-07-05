@@ -16,15 +16,16 @@
             │
         AgentService ── ChatClient(通义 qwen) ──┐
             │                                   │ 自主编排
-            └──► MCP Client (SSE) ──────────────┘
+      └──► MCP Client (Streamable HTTP) ──┘
                        │
-                http://localhost:8080/sse
+        http://localhost:8080
                        │
               logistics-mcp-server（工具：createCustomerServiceTicket 等）
 ```
 
-- **LLM**：通义千问，走 OpenAI 兼容模式（`https://dashscope.aliyuncs.com/compatible-mode`）。
-- **工具来源**：MCP Client 经 SSE 自动发现 server 暴露的工具并注册为 `ToolCallback`。
+- 可编辑架构图：[`logistics-agent-architecture.drawio`](./logistics-agent-architecture.drawio)
+- **LLM**：通义千问，走 OpenAI 兼容模式（`https://dashscope.aliyuncs.com/compatible-mode/v1`）。
+- **工具来源**：MCP Client 经 Streamable HTTP 发现 server 暴露的工具并注册为 `ToolCallback`。
 - **失败语义纯 prompt 驱动**：agent 侧不写任何重试/分支代码，工具返回的 `resultType` 原样回灌给 LLM，
   由 system prompt 规定三类结果的用户可见行为。
 
@@ -40,8 +41,7 @@
 - 运行中的 `logistics-mcp-server`（默认 `http://localhost:8080`）
 - 通义 API Key，通过环境变量 `DASHSCOPE_API_KEY` 注入
 
-> 说明：`application.yml` 中模型名为 `qwen3.7-plus`。若 DashScope 返回模型不存在的错误，
-> 请改为有效的商用模型名（如 `qwen-plus` / `qwen-max` / `qwen-turbo`，这些均支持 function calling）。
+> 当前默认模型为 `qwen-plus`。如需切换，可修改 `application.yml` 中的 `spring.ai.openai.chat.model`。
 
 ## 构建与测试
 
@@ -73,7 +73,7 @@ mvn -B clean test
    cd logistics-agent && mvn spring-boot:run
    ```
 
-3. 用 curl 触达 4 个场景（mock 数据见 server 的 `MockData`）：
+3. 用 curl 触达 4 个建工单场景（mock 数据见 server 的 `MockData`）：
 
    ```bash
    # 1) 成功：用户 1001 + 运单 9001 → 创建工单成功
@@ -99,13 +99,18 @@ mvn -B clean test
 
 预期：场景 1 给出工单号；场景 2 解释运单不存在；场景 3、4 提示"系统繁忙，请稍后重试"。
 
+补充：仓库中的 [`requests.http`](./requests.http) 还提供了第 5 个“纯查询运单状态”的请求样例，适合在 VS Code REST Client 中直接联调。
+
 ## 配置一览（`application.yml`）
 
 | 配置项                                                    | 值                                                  |
 | -------------------------------------------------------- | --------------------------------------------------- |
 | `server.port`                                            | `8081`                                              |
-| `spring.ai.openai.base-url`                              | `https://dashscope.aliyuncs.com/compatible-mode`    |
-| `spring.ai.openai.api-key`                               | `${DASHSCOPE_API_KEY}`                              |
-| `spring.ai.openai.chat.options.model`                   | `qwen3.7-plus`                                      |
-| `spring.ai.mcp.client.sse.connections.logistics-server.url` | `http://localhost:8080`                         |
-| `spring.ai.mcp.client.toolcallback.enabled`             | `true`                                              |
+| `spring.ai.openai.base-url`                              | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| `spring.ai.openai.api-key`                               | `${DASHSCOPE_API_KEY:}`                             |
+| `spring.ai.openai.chat.model`                            | `qwen-plus`                                         |
+| `spring.ai.openai.chat.temperature`                      | `0.1`                                               |
+| `spring.ai.mcp.client.type`                              | `SYNC`                                              |
+| `spring.ai.mcp.client.request-timeout`                   | `30s`                                               |
+| `spring.ai.mcp.client.streamable-http.connections.logistics-server.url` | `http://localhost:8080`                 |
+| `spring.ai.mcp.client.toolcallback.enabled`              | `true`                                              |

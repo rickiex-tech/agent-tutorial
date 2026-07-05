@@ -1,0 +1,32 @@
+---
+title: logistics-agent 应用架构图
+---
+flowchart TD
+  classDef actor fill:#F6F0E1,stroke:#8A6B3D,stroke-width:1.5px,color:#2F2415
+  classDef app fill:#EAF3FB,stroke:#3C6E99,stroke-width:1.5px,color:#17324D
+  classDef core fill:#EAF7EE,stroke:#4C8E64,stroke-width:1.5px,color:#14361F
+  classDef infra fill:#FFF3E2,stroke:#B56A00,stroke-width:1.5px,color:#4D2C00
+  classDef note fill:#F7F7F7,stroke:#7C7C7C,stroke-width:1px,stroke-dasharray:4 3,color:#333333
+
+  request[用户发起客服诉求]:::actor --> api
+
+  subgraph agent[logistics-agent 应用]
+    direction TB
+    api[REST API<br>/api/v1/agent/chat<br>8081]:::app --> controller[AgentController]:::app
+    controller --> service[AgentService]:::core
+    service --> chat[Spring AI ChatClient]:::core
+    chat --> reply[生成自然语言答复]:::actor
+  end
+
+  prompt[System Prompt<br>约束三类失败语义的回复策略]:::note
+  prompt -.约束回复策略.-> chat
+
+  subgraph abilities[能力层]
+    direction TB
+    model[大模型能力<br>通义千问<br>DashScope OpenAI 兼容接口]:::infra
+    mcp[MCP 工具能力<br>MCP Client 自动注册远程工具<br>为 ToolCallback]:::infra
+  end
+
+  chat --> model
+  chat --> mcp
+  reply --> response[返回给用户]:::actor

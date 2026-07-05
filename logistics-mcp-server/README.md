@@ -9,9 +9,9 @@
 
 ## 技术栈
 
-- Spring Boot 4.0.5 / Spring AI 2.0.0 / Java 21 / Maven
+- Spring Boot 4.1.0 / Spring AI 2.0.0 / Java 21 / Maven
 - 领域工具与业务编排工具通过 Spring AI `@Tool` 暴露为 **MCP tools**
-  （`spring-ai-starter-mcp-server-webmvc`）
+  （`spring-ai-starter-mcp-server-webmvc`，传输协议：**Streamable HTTP**，默认端口 8080）
 
 ## 架构对应
 
@@ -22,7 +22,7 @@
 业务编排工具层  CustomerServiceTicketTool.createCustomerServiceTicket
   │  串行：查询用户 → 查询运单 → 创建工单，强前置校验、失败即终止
   ▼
-领域工具层  getUser / getShipment / createTicket   （按业务域封装，mock 数据）
+领域工具层  UserDomainTools / ShipmentDomainTools / TicketDomainTools   （按业务域封装，mock 数据）
   ▼
 （真实环境）API Gateway → 既有微服务 200+ 业务 API
 ```
@@ -34,6 +34,117 @@
   - `BUSINESS_FAILURE`（用户/运单不存在）→ 终止，不重试
   - `SYSTEM_FAILURE`（超时/上游不可用）→ 可重试（`isRetryable()`）
 - **串行编排 + 失败即终止**：任意一步未成功，立即返回该步骤失败结果，不执行后续步骤
+
+## MCP Tools 详解
+
+### 工具分层
+
+MCP Server 暴露**两层工具**给智能体（MCP client）：
+
+#### 1️⃣ 业务编排工具（Composite）
+
+| 工具 | 职责 | 签名 | 响应 |
+|------|------|------|------|
+| **createCustomerServiceTicket** | 编排流程：查询用户 → 查询运单 → 创建工单，强前置校验、失败即终止 | `(userId: long, shipmentId: long, content: String) -> Ticket` | `ToolResult<Ticket>` |
+
+**设计点**：
+- 智能体只需调用这一个工具，无需自行拼装三个底层工具或处理中间失败。
+- 工具内部实现串行逻辑 + 失败即终止（[源码](src/main/java/com/logistics/mcp/tools/composite/CustomerServiceTicketTool.java)）。
+- 任意一步失败时，立即返回该步骤的失败结果（包括错误码、错误分类、重试标记）。
+
+#### 2️⃣ 领域工具（Domain）
+
+按业务域封装，每个领域一个工具类，暴露单个职责的原子操作：
+
+| 工具 | 领域 | 职责 | 签名 | 失败行为 |
+|------|------|------|------|----------|
+| **getUser** | 用户域 | 查询用户信息 | `(userId: long) -> User` | 用户不存在：`BUSINESS_FAILURE`；用户服务超时（ID=1500）：`SYSTEM_FAILURE` |
+| **getShipment** | 运单域 | 查询运单信息 | `(shipmentId: long) -> Shipment` | 运单不存在：`BUSINESS_FAILURE` |
+| **createTicket** | 客服域 | 创建工单 | `(userId, shipmentId, content) -> Ticket` | 工单服务不可用（userId=1002）：`SYSTEM_FAILURE` |
+
+**设计点**：
+- 每个工具对接一个既有微服务的 API（示例见工具注释 `对接 GET /api/v1/xxx`）。
+- Mock 数据层（[MockData](src/main/java/com/logistics/mcp/tools/domain/MockData.java)）模拟既有数据库和服务行为。
+- 真实环境中仅需替换 Mock → 真实 HTTP 调用，工具接口和失败语义保持不变。
+
+### 响应格式（ToolResult）
+
+所有工具返回统一格式（[源码](src/main/java/com/logistics/mcp/common/ToolResult.java)）：
+
+```java
+public record ToolResult<T>(
+    int code,                  // 业务码（0=成功, 4xxxx=业务失败, 5xxxx=系统失败）
+    String message,            // 错误或成功描述
+    ResultType resultType,     // 结果分类：SUCCESS / BUSINESS_FAILURE / SYSTEM_FAILURE
+    T data                     // 响应数据（失败时为 null）
+)
+```
+
+**典型响应示例**：
+
+```json
+// ✅ SUCCESS
+{
+  "code": 0,
+  "message": "success",
+  "resultType": "SUCCESS",
+  "data": { "ticketId": 70001, "userId": 1001, "shipmentId": 9001, ... }
+}
+
+// ❌ BUSINESS_FAILURE（用户不存在，不可重试）
+{
+  "code": 40401,
+  "message": "user not found: 1500",
+  "resultType": "BUSINESS_FAILURE",
+  "data": null,
+  "isRetryable": false
+}
+
+// ⚠️ SYSTEM_FAILURE（服务超时，可重试）
+{
+  "code": 50001,
+  "message": "user service timeout",
+  "resultType": "SYSTEM_FAILURE",
+  "data": null,
+  "isRetryable": true
+}
+```
+
+### 失败语义
+
+| resultType | 含义 | 智能体应该怎么做 | 示例 |
+|---|---|---|---|
+| `SUCCESS` | 操作成功 | 使用返回的 `data`，告诉用户结果 | 工单创建成功，返回工单号 |
+| `BUSINESS_FAILURE` | 业务规则冲突，用户信息有问题 | **不重试**，向用户解释失败原因 | 运单不存在、用户不存在 |
+| `SYSTEM_FAILURE` | 系统临时故障，可能稍后恢复 | 告诉用户"系统繁忙，请稍后重试" | 服务超时、上游不可用 |
+
+**在智能体中的体现**（见 [AgentService](../logistics-agent/src/main/java/com/logistics/agent/service/AgentService.java)）：
+- 工具调用后拿到 `ToolResult`，agent 通过 `isRetryable()` / `resultType` 决定用户可见的回复。
+- Agent **无需写任何重试代码** —— 失败语义完全由 prompt 驱动（system prompt 规定三类结果对应的用户回复）。
+
+### 编排模式：串行 + 失败即终止
+
+[CustomerServiceTicketTool](src/main/java/com/logistics/mcp/tools/composite/CustomerServiceTicketTool.java) 展示核心模式：
+
+```java
+// 步骤 1：查询用户，失败即返回
+ToolResult<User> userResult = userDomainTools.getUser(userId);
+if (!userResult.isSuccess()) {
+    return userResult.propagateFailure("查询用户信息失败: ");  // 包含步骤前缀，直接返回
+}
+
+// 步骤 2：查询运单，失败即返回
+ToolResult<Shipment> shipmentResult = shipmentDomainTools.getShipment(shipmentId);
+if (!shipmentResult.isSuccess()) {
+    return shipmentResult.propagateFailure("查询运单信息失败: ");  // 同样立即返回
+}
+
+// 步骤 3：创建工单
+ToolResult<Ticket> ticketResult = ticketDomainTools.createTicket(...);
+// ...
+```
+
+关键约束：**强前置校验** —— 后续步骤必须等待前序步骤成功，否则立即终止，不执行无效操作。
 
 ## 运行
 
