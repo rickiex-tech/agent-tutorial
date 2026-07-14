@@ -4,6 +4,15 @@ server:
 spring:
   application:
     name: logistics-agent
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/agent?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${SPRING_DATASOURCE_USERNAME:root}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/schema.sql
   ai:
     # 通义千问 —— OpenAI 兼容模式
     openai:
@@ -30,3 +39,17 @@ spring:
 logging:
   level:
     "[org.springframework.ai]": INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+logistics:
+  persistence:
+    in-memory:
+      enabled: ${LOGISTICS_PERSISTENCE_IN_MEMORY_ENABLED:false}

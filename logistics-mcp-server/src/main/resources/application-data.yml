@@ -1,0 +1,13 @@
+spring:
+  config:
+    activate:
+      on-profile: data
+
+server:
+  port: 8082
+
+logistics:
+  mcp:
+    tools:
+      business-enabled: false
+      data-enabled: true

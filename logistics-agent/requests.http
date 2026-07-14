@@ -9,6 +9,9 @@ POST {{host}}/api/v1/agent/chat
 Content-Type: application/json
 
 {
+  "sessionId": "sess-1001",
+  "userId": 1001,
+  "roles": "agent-user",
   "message": "用户1001的运单9001破损了，帮我创建一个客服工单，内容是包裹外箱破损"
 }
 
@@ -17,6 +20,9 @@ POST {{host}}/api/v1/agent/chat
 Content-Type: application/json
 
 {
+  "sessionId": "sess-1001",
+  "userId": 1001,
+  "roles": "agent-user",
   "message": "用户1001的运单9999要投诉，帮我建工单"
 }
 
@@ -25,6 +31,9 @@ POST {{host}}/api/v1/agent/chat
 Content-Type: application/json
 
 {
+  "sessionId": "sess-1500",
+  "userId": 1500,
+  "roles": "agent-user",
   "message": "用户1500的运单9001有问题，帮我建工单"
 }
 
@@ -33,6 +42,9 @@ POST {{host}}/api/v1/agent/chat
 Content-Type: application/json
 
 {
+  "sessionId": "sess-1002",
+  "userId": 1002,
+  "roles": "agent-user",
   "message": "用户1002的运单9002延误，帮我建工单"
 }
 
@@ -41,5 +53,8 @@ POST {{host}}/api/v1/agent/chat
 Content-Type: application/json
 
 {
+  "sessionId": "sess-1001",
+  "userId": 1001,
+  "roles": "agent-user",
   "message": "帮我查一下用户1001的运单9001现在到哪了"
 }

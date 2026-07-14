@@ -1,0 +1,17 @@
+openapi: 3.0.3
+info:
+  title: Shipment Domain API
+  version: 1.0.0
+paths:
+  /api/v1/shipments/{shipmentId}:
+    get:
+      summary: Get shipment by ID
+      parameters:
+        - in: path
+          name: shipmentId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: success

@@ -1,6 +1,7 @@
 package com.logistics.mcp.tools.composite;
 
 import com.logistics.mcp.common.ToolResult;
+import com.logistics.mcp.common.SystemFailureRetryExecutor;
 import com.logistics.mcp.tools.domain.Shipment;
 import com.logistics.mcp.tools.domain.ShipmentDomainTools;
 import com.logistics.mcp.tools.domain.Ticket;
@@ -24,6 +25,7 @@ public class CustomerServiceTicketTool {
     private final UserDomainTools userDomainTools;
     private final ShipmentDomainTools shipmentDomainTools;
     private final TicketDomainTools ticketDomainTools;
+    private final SystemFailureRetryExecutor retryExecutor;
 
     public CustomerServiceTicketTool(UserDomainTools userDomainTools,
                                      ShipmentDomainTools shipmentDomainTools,
@@ -31,6 +33,7 @@ public class CustomerServiceTicketTool {
         this.userDomainTools = userDomainTools;
         this.shipmentDomainTools = shipmentDomainTools;
         this.ticketDomainTools = ticketDomainTools;
+        this.retryExecutor = new SystemFailureRetryExecutor();
     }
 
     @Tool(description = "创建客服工单：串行执行 查询用户信息 → 查询运单信息 → 创建工单，"
@@ -41,19 +44,22 @@ public class CustomerServiceTicketTool {
             @ToolParam(description = "工单内容") String content) {
 
         // 步骤 1：查询用户信息，失败即终止
-        ToolResult<User> userResult = userDomainTools.getUser(userId);
+        ToolResult<User> userResult = retryExecutor.execute("get_user",
+            () -> userDomainTools.getUser(userId));
         if (!userResult.isSuccess()) {
             return userResult.propagateFailure("查询用户信息失败: ");
         }
 
         // 步骤 2：查询运单信息，失败即终止
-        ToolResult<Shipment> shipmentResult = shipmentDomainTools.getShipment(shipmentId);
+        ToolResult<Shipment> shipmentResult = retryExecutor.execute("get_shipment",
+            () -> shipmentDomainTools.getShipment(shipmentId));
         if (!shipmentResult.isSuccess()) {
             return shipmentResult.propagateFailure("查询运单信息失败: ");
         }
 
         // 步骤 3：创建工单，失败则报错
-        ToolResult<Ticket> ticketResult = ticketDomainTools.createTicket(userId, shipmentId, content);
+        ToolResult<Ticket> ticketResult = retryExecutor.execute("create_ticket",
+            () -> ticketDomainTools.createTicket(userId, shipmentId, content));
         if (!ticketResult.isSuccess()) {
             return ticketResult.propagateFailure("创建工单失败: ");
         }

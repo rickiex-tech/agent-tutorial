@@ -35,6 +35,14 @@
   - `SYSTEM_FAILURE`（超时/上游不可用）→ 可重试（`isRetryable()`）
 - **串行编排 + 失败即终止**：任意一步未成功，立即返回该步骤失败结果，不执行后续步骤
 
+## 治理层与可观测性（PoC 近似实现）
+
+- **治理过滤器**：统一认证头校验（`X-User-Id`）、基础限流、权限上下文透传。
+- **受控重试**：仅 `SYSTEM_FAILURE` 进入重试策略，`BUSINESS_FAILURE` 立即终止。
+- **熔断保护**：基础熔断器避免持续故障放大。
+- **审计切面**：所有 `@Tool` 调用写入 `agent_tool_invocation_log`（内存 mapper），记录 `tool_name/tool_layer/result_type/duration_ms`，并做敏感字段脱敏。
+- **指标与健康检查**：启用 Actuator 与 Prometheus（`/actuator/health`、`/actuator/prometheus`）。
+
 ## MCP Tools 详解
 
 ### 工具分层
@@ -122,6 +130,8 @@ public record ToolResult<T>(
 - 工具调用后拿到 `ToolResult`，agent 通过 `isRetryable()` / `resultType` 决定用户可见的回复。
 - Agent **无需写任何重试代码** —— 失败语义完全由 prompt 驱动（system prompt 规定三类结果对应的用户回复）。
 
+**系统失败重试策略说明**：当工具返回 `SYSTEM_FAILURE` 时，MCP Server 内部的 `SystemFailureRetryExecutor`（[链接](src/main/java/com/logistics/mcp/common/SystemFailureRetryExecutor.java)）**对用户透明地进行受控重试**（配置项：`logistics.mcp.circuit-breaker.retry-max-attempts`）；若所有重试均失败，工具返回该结果给 Agent，Agent 的 prompt 驱动向最终用户呈现"稍后重试"提示（不再自动调用）。两层重试分别处理内部稳定性和用户可见行为。
+
 ### 编排模式：串行 + 失败即终止
 
 [CustomerServiceTicketTool](src/main/java/com/logistics/mcp/tools/composite/CustomerServiceTicketTool.java) 展示核心模式：
@@ -159,6 +169,18 @@ mvn test
 mvn spring-boot:run
 ```
 
+按工具层分组启动（模拟独立部署）：
+
+```bash
+# 业务域 MCP（domain + composite）
+mvn spring-boot:run -Dspring-boot.run.profiles=business
+
+# 数据域 MCP（data）
+mvn spring-boot:run -Dspring-boot.run.profiles=data
+```
+
+> `business` 默认端口 `8080`，`data` 默认端口 `8082`。
+
 ## 测试覆盖
 
 | 场景 | 输入 | 期望结果 |
@@ -167,3 +189,13 @@ mvn spring-boot:run
 | 用户查询失败 | user=1500 | SYSTEM_FAILURE，终止，可重试 |
 | 运单不存在 | user=1001, shipment=9999 | BUSINESS_FAILURE，终止，不重试 |
 | 创建工单失败 | user=1002, shipment=9002 | SYSTEM_FAILURE，报错 |
+
+## OpenAPI 契约与 CI
+
+- 领域工具契约位于 `src/main/resources/openapi/`。
+- 契约校验测试位于 `src/test/java/com/logistics/mcp/contracts/OpenApiContractTest.java`。
+- 仓库 CI（`.github/workflows/ci.yml`）会执行 `mvn test`，包括契约校验。
+
+## 命名与封装规范
+
+工具命名与封装规范文档见 `../docs/tool-naming-and-encapsulation.md`。

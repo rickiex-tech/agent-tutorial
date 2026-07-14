@@ -79,22 +79,22 @@ mvn -B clean test
    # 1) 成功：用户 1001 + 运单 9001 → 创建工单成功
    curl -s -X POST http://localhost:8081/api/v1/agent/chat \
      -H 'Content-Type: application/json' \
-     -d '{"message":"用户1001的运单9001破损了，帮我创建一个客服工单，内容是包裹外箱破损"}'
+     -d '{"sessionId":"sess-1001","userId":1001,"roles":"agent-user","message":"用户1001的运单9001破损了，帮我创建一个客服工单，内容是包裹外箱破损"}'
 
    # 2) 业务失败：运单 9999 不存在 → 解释并引导核对，不重试
    curl -s -X POST http://localhost:8081/api/v1/agent/chat \
      -H 'Content-Type: application/json' \
-     -d '{"message":"用户1001的运单9999要投诉，帮我建工单"}'
+     -d '{"sessionId":"sess-1001","userId":1001,"roles":"agent-user","message":"用户1001的运单9999要投诉，帮我建工单"}'
 
    # 3) 系统失败（查询用户）：用户 1500 上游不可用 → "系统繁忙，请稍后重试"
    curl -s -X POST http://localhost:8081/api/v1/agent/chat \
      -H 'Content-Type: application/json' \
-     -d '{"message":"用户1500的运单9001有问题，帮我建工单"}'
+     -d '{"sessionId":"sess-1500","userId":1500,"roles":"agent-user","message":"用户1500的运单9001有问题，帮我建工单"}'
 
    # 4) 系统失败（创建工单）：用户 1002 工单服务故障 → "系统繁忙，请稍后重试"
    curl -s -X POST http://localhost:8081/api/v1/agent/chat \
      -H 'Content-Type: application/json' \
-     -d '{"message":"用户1002的运单9002延误，帮我建工单"}'
+     -d '{"sessionId":"sess-1002","userId":1002,"roles":"agent-user","message":"用户1002的运单9002延误，帮我建工单"}'
    ```
 
 预期：场景 1 给出工单号；场景 2 解释运单不存在；场景 3、4 提示"系统繁忙，请稍后重试"。
@@ -114,3 +114,14 @@ mvn -B clean test
 | `spring.ai.mcp.client.request-timeout`                   | `30s`                                               |
 | `spring.ai.mcp.client.streamable-http.connections.logistics-server.url` | `http://localhost:8080`                 |
 | `spring.ai.mcp.client.toolcallback.enabled`              | `true`                                              |
+
+## 会话与上下文
+
+`POST /api/v1/agent/chat` 支持以下字段：
+
+- `message`：用户输入（必填）
+- `sessionId`：会话 ID（建议传入）
+- `userId`：发起用户 ID（用于权限上下文）
+- `roles`：用户角色（用于权限上下文）
+
+系统默认将多轮上下文持久化到 MySQL 的 `agent_session`，并将运行审计写入 `agent_tool_invocation_log`。如需本地回退为内存实现，可设置 `LOGISTICS_PERSISTENCE_IN_MEMORY_ENABLED=true`。

@@ -1,6 +1,7 @@
 package com.logistics.agent.web;
 
 import com.logistics.agent.service.AgentService;
+import com.logistics.agent.session.AgentSessionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -10,6 +11,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -24,11 +26,14 @@ class AgentControllerTest {
 
     private MockMvc mockMvc;
     private AgentService agentService;
+    private AgentSessionService sessionService;
 
     @BeforeEach
     void setUp() {
         agentService = mock(AgentService.class);
-        mockMvc = MockMvcBuilders.standaloneSetup(new AgentController(agentService)).build();
+        sessionService = mock(AgentSessionService.class);
+        given(sessionService.normalizeSessionId(anyString())).willReturn("sess-test");
+        mockMvc = MockMvcBuilders.standaloneSetup(new AgentController(agentService, sessionService)).build();
     }
 
     @Test
@@ -38,8 +43,12 @@ class AgentControllerTest {
 
         mockMvc.perform(post("/api/v1/agent/chat")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"message\":\"用户1001运单9001破损，帮忙建个工单\"}"))
+                .content("{\"message\":\"用户1001运单9001破损，帮忙建个工单\",\"sessionId\":\"sess-test\",\"userId\":1001,\"roles\":\"agent-user\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.reply").value("已为您创建工单 70001，我们会尽快跟进。"));
+            .andExpect(jsonPath("$.reply").value("已为您创建工单 70001，我们会尽快跟进。"))
+            .andExpect(jsonPath("$.sessionId").value("sess-test"));
+
+        verify(sessionService).appendUserTurn("sess-test", 1001L, "用户1001运单9001破损，帮忙建个工单");
+        verify(sessionService).appendAssistantTurn("sess-test", 1001L, "已为您创建工单 70001，我们会尽快跟进。");
     }
 }

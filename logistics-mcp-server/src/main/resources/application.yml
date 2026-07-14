@@ -7,3 +7,28 @@ spring:
         name: logistics-mcp-server
         version: 0.0.1
         protocol: STREAMABLE
+
+logistics:
+  mcp:
+    governance:
+      require-auth-header: true
+      auth-header-name: X-User-Id
+      rate-limit-per-minute: 120
+      # MCP 握手路径豁免鉴权，支持客户端发现工具；业务工具调用仍通过 MCP 通道并保留权限检查（逗号分隔）
+      excluded-auth-paths: /mcp
+    circuit-breaker:
+      failure-threshold: 2
+      open-seconds: 20
+      retry-max-attempts: 2
+    tools:
+      business-enabled: true
+      data-enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always

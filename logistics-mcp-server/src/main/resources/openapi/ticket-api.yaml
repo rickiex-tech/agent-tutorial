@@ -1,0 +1,13 @@
+openapi: 3.0.3
+info:
+  title: Ticket Domain API
+  version: 1.0.0
+paths:
+  /api/v1/tickets:
+    post:
+      summary: Create ticket
+      requestBody:
+        required: true
+      responses:
+        '200':
+          description: success
