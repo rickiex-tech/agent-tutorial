@@ -131,30 +131,32 @@ public class AuditingToolCallbackProvider implements ToolCallbackProvider {
             String resultType,
             long durationMs,
             String errorMsg) {
+        // 从 PermissionContextHolder 获取 sessionId
+        String sessionId = null;
+        var contextOpt = PermissionContextHolder.get();
+        if (contextOpt.isPresent()) {
+            sessionId = contextOpt.get().sessionId();
+        }
+
+        String responseSummary = truncateResponse(result);
+        AgentToolInvocationLogEntity entity = new AgentToolInvocationLogEntity(
+                0,  // id 自增
+                sessionId,
+                toolName,
+                toolLayer,
+                requestParams,
+                responseSummary,
+                resultType,
+                durationMs,
+                LocalDateTime.now(),
+                LocalDateTime.now()
+        );
+
         try {
-            // 从 PermissionContextHolder 获取 sessionId
-            String sessionId = null;
-            var contextOpt = PermissionContextHolder.get();
-            if (contextOpt.isPresent()) {
-                sessionId = contextOpt.get().sessionId();
-            }
-            
-            String responseSummary = truncateResponse(result);
-            AgentToolInvocationLogEntity entity = new AgentToolInvocationLogEntity(
-                    0,  // id 自增
-                    sessionId,
-                    toolName,
-                    toolLayer,
-                    requestParams,
-                    responseSummary,
-                    resultType,
-                    durationMs,
-                    LocalDateTime.now(),
-                    LocalDateTime.now()
-            );
             auditLogMapper.insert(entity);
-        } catch (Exception e) {
-            logger.log(Level.WARNING, "Failed to record audit log for tool " + toolName, e);
+        } catch (RuntimeException e) {
+            logger.log(Level.SEVERE, "Failed to record audit log for tool " + toolName, e);
+            throw e;
         }
     }
 

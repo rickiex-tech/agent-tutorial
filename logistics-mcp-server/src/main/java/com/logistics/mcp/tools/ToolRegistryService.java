@@ -1,51 +1,31 @@
 package com.logistics.mcp.tools;
 
-import org.springframework.ai.tool.annotation.Tool;
-import org.springframework.context.ApplicationContext;
+import org.springframework.ai.tool.ToolCallback;
+import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.stereotype.Service;
-import java.lang.reflect.Method;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
- * 工具注册表服务：通过反射扫描应用中所有被 @Tool 注解的方法，构建工具元数据。
+ * 工具注册表服务：从已注册的 ToolCallbackProvider 中读取工具元数据。
  */
 @Service
 public class ToolRegistryService {
 
-    private final ApplicationContext applicationContext;
+    private final ToolCallbackProvider toolCallbackProvider;
 
-    public ToolRegistryService(ApplicationContext applicationContext) {
-        this.applicationContext = applicationContext;
+    public ToolRegistryService(ToolCallbackProvider toolCallbackProvider) {
+        this.toolCallbackProvider = toolCallbackProvider;
     }
 
     /**
      * 获取所有已注册工具的元数据列表。
-     * @return 工具元数据列表，按工具方法所在类推断分组（composite / domain / data）
+     * @return 工具元数据列表，按工具名称推断分组（composite / domain / data）
      */
     public List<ToolMetadata> listAllTools() {
-        List<ToolMetadata> tools = new ArrayList<>();
-        
-        // 遍历所有 beans，查找有 @Tool 方法的类
-        String[] beanNames = applicationContext.getBeanDefinitionNames();
-        for (String beanName : beanNames) {
-            Object bean = applicationContext.getBean(beanName);
-            Class<?> beanClass = bean.getClass();
-            
-            // 遍历类的所有方法
-            for (Method method : beanClass.getDeclaredMethods()) {
-                if (method.isAnnotationPresent(Tool.class)) {
-                    Tool toolAnnotation = method.getAnnotation(Tool.class);
-                    String toolName = method.getName();
-                    String description = toolAnnotation.description();
-                    String layer = inferLayer(beanClass);
-                    
-                    tools.add(new ToolMetadata(toolName, layer, description));
-                }
-            }
-        }
-        
-        return tools;
+        return Arrays.stream(toolCallbackProvider.getToolCallbacks())
+                .map(this::toMetadata)
+                .toList();
     }
 
     /**
@@ -59,20 +39,25 @@ public class ToolRegistryService {
                 .toList();
     }
 
+    private ToolMetadata toMetadata(ToolCallback callback) {
+        String name = callback.getToolDefinition().name();
+        String description = callback.getToolDefinition().description();
+        return new ToolMetadata(name, inferLayer(name), description);
+    }
+
     /**
-     * 从 bean 类名推断工具分组。
-     * @param beanClass bean 类
+     * 从工具名称推断工具分组。
+     * @param toolName 工具方法名
      * @return composite / domain / data
      */
-    private String inferLayer(Class<?> beanClass) {
-        String className = beanClass.getSimpleName().toLowerCase();
-        
-        if (className.contains("composite")) {
+    private String inferLayer(String toolName) {
+        String lower = toolName.toLowerCase();
+        if (lower.contains("customerservice") || lower.contains("composite")) {
             return "composite";
-        } else if (className.contains("domain")) {
-            return "domain";
-        } else {
+        } else if (lower.contains("metric") || lower.contains("data")) {
             return "data";
+        } else {
+            return "domain";
         }
     }
 }

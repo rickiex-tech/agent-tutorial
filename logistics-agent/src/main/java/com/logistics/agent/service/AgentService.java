@@ -37,7 +37,7 @@ public class AgentService {
 
     private final ChatClient chatClient;
 
-    public AgentService(ChatClient.Builder chatClientBuilder, ToolCallbackProvider mcpToolCallbackProvider) {
+      public AgentService(ChatClient.Builder chatClientBuilder, ToolCallbackProvider mcpToolCallbackProvider) {
         this.chatClient = chatClientBuilder
                 .defaultSystem(SYSTEM_PROMPT)
                 .defaultTools(mcpToolCallbackProvider)

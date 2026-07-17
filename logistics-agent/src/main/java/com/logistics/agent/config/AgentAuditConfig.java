@@ -1,7 +1,6 @@
 package com.logistics.agent.config;
 
 import org.springframework.ai.tool.ToolCallbackProvider;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -17,11 +16,10 @@ public class AgentAuditConfig {
 
     /**
      * 创建审计包装的 ToolCallbackProvider，作为主要的工具回调提供者。
-     * 原始的 MCP ToolCallbackProvider 通过 @ConditionalOnBean 自动注入。
+        * 原始的 MCP ToolCallbackProvider 通过 Spring 自动注入。
      */
     @Bean
     @Primary
-    @ConditionalOnBean({ToolCallbackProvider.class, ToolGroupCatalog.class})
     public ToolCallbackProvider auditingToolCallbackProvider(
             ToolCallbackProvider delegate,
             ToolGroupCatalog toolGroupCatalog,
