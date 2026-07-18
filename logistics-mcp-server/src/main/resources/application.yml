@@ -14,8 +14,9 @@ logistics:
       require-auth-header: true
       auth-header-name: X-User-Id
       rate-limit-per-minute: 120
-      # MCP 握手路径豁免鉴权，支持客户端发现工具；业务工具调用仍通过 MCP 通道并保留权限检查（逗号分隔）
-      excluded-auth-paths: /mcp
+      # MCP 流量鉴权：Agent 侧通过 McpClientAuthHeaderConfig 注入 X-User-Id Header，
+      # 无需豁免 /mcp 路径；握手阶段注入 anonymous 保证连通性
+      # excluded-auth-paths: /mcp   # 已禁用：启用完整鉴权链路
     circuit-breaker:
       failure-threshold: 2
       open-seconds: 20

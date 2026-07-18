@@ -70,12 +70,15 @@ public class AuditingToolCallbackProvider implements ToolCallbackProvider {
                     result = original.call(request);
                     
                     // 尝试从 result 中推测 resultType
-                    if (result != null && result.contains("\"resultType\"")) {
-                        if (result.contains("\"resultType\":\"SUCCESS\"")) {
+                    // MCP 响应中的内层 JSON 可能带反斜杠转义 (\"resultType\":\"SUCCESS\")，
+                    // 因此先归一化转义引号再做匹配，兼容两种格式
+                    if (result != null) {
+                        String normalized = result.replace("\\\"", "\"");
+                        if (normalized.contains("\"resultType\":\"SUCCESS\"")) {
                             resultType = "SUCCESS";
-                        } else if (result.contains("\"resultType\":\"BUSINESS_FAILURE\"")) {
+                        } else if (normalized.contains("\"resultType\":\"BUSINESS_FAILURE\"")) {
                             resultType = "BUSINESS_FAILURE";
-                        } else if (result.contains("\"resultType\":\"SYSTEM_FAILURE\"")) {
+                        } else if (normalized.contains("\"resultType\":\"SYSTEM_FAILURE\"")) {
                             resultType = "SYSTEM_FAILURE";
                         }
                     }
@@ -111,10 +114,11 @@ public class AuditingToolCallbackProvider implements ToolCallbackProvider {
         } catch (Exception e) {
             logger.log(Level.WARNING, "Failed to infer tool layer for " + toolName, e);
         }
-        // 降级：根据工具名推断
-        if (toolName.contains("create") && toolName.contains("ticket")) {
+        // 降级：根据工具名推断（不区分大小写）
+        String lower = toolName.toLowerCase();
+        if (lower.contains("create") && lower.contains("ticket")) {
             return "composite";
-        } else if (toolName.startsWith("get")) {
+        } else if (lower.startsWith("get")) {
             return "domain";
         }
         return "data";

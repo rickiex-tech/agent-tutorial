@@ -44,10 +44,10 @@ mvn spring-boot:run              # 默认端口 8080
 cd logistics-agent
 mvn spring-boot:run              # 默认端口 8081
 
-# 3️⃣ 发送请求
+# 3️⃣ 发送请求（完整字段见 logistics-agent/README.md）
 curl -X POST http://localhost:8081/api/v1/agent/chat \
   -H 'Content-Type: application/json' \
-  -d '{"message":"帮我查一下用户1001的运单9001现在到哪了"}'
+  -d '{"sessionId":"sess-1001","userId":1001,"roles":"agent-user","message":"用户1001的运单9001破损了，帮我创建一个客服工单，内容是包裹外箱破损"}'
 ```
 
 ### 测试
@@ -117,6 +117,9 @@ mvn test
 
 ### 4. Streamable HTTP 传输
 MCP 传输协议已迁移到新的 **Streamable HTTP**（SSE 已弃用），端点为 `/mcp`，默认端口 8080。
+
+### 5. 端到端鉴权链路
+Agent 侧通过 `McpClientAuthHeaderConfig` 自动把 `PermissionContext` 透传为 HTTP Header（`X-User-Id` / `X-User-Roles` / `X-Session-Id`），MCP Server 的 `GatewayGovernanceFilter` 对所有 `/mcp` 流量做鉴权（`require-auth-header: true`），无需豁免路径。握手阶段注入 `anonymous` 保证连通性。
 
 ## 技术栈
 

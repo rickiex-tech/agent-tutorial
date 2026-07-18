@@ -125,3 +125,45 @@ mvn -B clean test
 - `roles`：用户角色（用于权限上下文）
 
 系统默认将多轮上下文持久化到 MySQL 的 `agent_session`，并将运行审计写入 `agent_tool_invocation_log`。如需本地回退为内存实现，可设置 `LOGISTICS_PERSISTENCE_IN_MEMORY_ENABLED=true`。
+
+## MCP 鉴权 Header 透传
+
+Agent 侧通过 `McpClientAuthHeaderConfig`（`security/McpClientAuthHeaderConfig.java`）向 MCP Client 的 `WebClient.Builder` 注入 `ExchangeFilterFunction`，把 `PermissionContextHolder` 中的权限上下文自动透传为 HTTP Header，让 MCP Server 的 `GatewayGovernanceFilter` 能对 `/mcp` 流量做鉴权。
+
+**注入的 Header**（与 MCP Server `application.yml` 对齐）：
+
+| Header | 来源 | 必填 | 说明 |
+|---|---|---|---|
+| `X-User-Id` | `PermissionContext.userId` | ✅ | 缺失时注入 `anonymous`，保证握手阶段连通 |
+| `X-User-Roles` | `PermissionContext.roles` | ❌ | 空值不注入 |
+| `X-Session-Id` | `PermissionContext.sessionId` | ❌ | 空值不注入 |
+
+**工作原理**：
+
+```
+AgentController.chat()
+    │  设置 PermissionContextHolder（ThreadLocal）
+    ▼
+AgentService.chat()
+    │  调用 MCP Client
+    ▼
+WebClient.Builder（McpClientAuthHeaderConfig 注入的 Filter）
+    │  从 ThreadLocal 读取 PermissionContext
+    │  注入 X-User-Id / X-User-Roles / X-Session-Id Header
+    ▼
+POST /mcp（带 Header）
+    │
+    ▼
+MCP Server GatewayGovernanceFilter
+    │  校验 X-User-Id（require-auth-header: true）
+    │  写入 PermissionContextHolder（MCP Server 侧）
+    ▼
+@Tool 方法执行 + 审计切面
+```
+
+**配置要点**：
+- MCP Server 的 `excluded-auth-paths` 已禁用，`/mcp` 流量需要 `X-User-Id` Header
+- Agent 侧无需手动处理 Header，由 `McpClientAuthHeaderConfig` 自动注入
+- 握手阶段（尚未进入 Controller）注入 `anonymous`，避免 401
+
+**测试覆盖**：`McpClientAuthHeaderConfigTest`（4 个场景）验证 Header 注入逻辑，不依赖 Spring 容器，CI 中稳定运行。
