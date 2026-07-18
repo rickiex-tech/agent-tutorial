@@ -13,14 +13,10 @@ CREATE TABLE IF NOT EXISTS agent_tool_invocation_log (
     session_id VARCHAR(64) NOT NULL,
     tool_name VARCHAR(128) NOT NULL,
     tool_layer VARCHAR(32) NOT NULL,
-    request_params TEXT,
-    response_summary TEXT,
+    request_params TEXT NULL,
+    response_summary TEXT NULL,
     result_type VARCHAR(32) NOT NULL,
     duration_ms BIGINT NOT NULL,
     create_time DATETIME NOT NULL,
     update_time DATETIME NOT NULL
 );
-
-ALTER TABLE agent_tool_invocation_log
-    MODIFY COLUMN request_params TEXT NULL,
-    MODIFY COLUMN response_summary TEXT NULL;
