@@ -23,3 +23,7 @@ target/
 
 # Copilot worktrees
 copilot-worktrees/
+
+# GitHub Copilot / Agent skills (local only)
+.github/
+.mimocode/
