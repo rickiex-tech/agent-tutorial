@@ -1,6 +1,7 @@
 package com.logistics.agent.orchestration;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
 import java.util.Collections;
@@ -40,10 +41,12 @@ public class ToolGroupCatalog {
         }
 
         try {
+            // 使用 ParameterizedTypeReference 保留泛型信息，避免 unchecked 警告，
+            // 同时让 Jackson 正确反序列化为 Map<String, Object>。
             Map<String, Object> response = webClient.get()
                     .uri("/api/v1/tools/describe")
                     .retrieve()
-                    .bodyToMono(Map.class)
+                    .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
                     .block();
 
             if (response != null && response.containsKey("summary")) {
@@ -65,11 +68,12 @@ public class ToolGroupCatalog {
      */
     public List<?> getToolsByLayer(String layer) {
         try {
-            List<?> tools = webClient.get()
+            // 使用 ParameterizedTypeReference 保留 List<Map<String, Object>> 的泛型信息，
+            // 避免 bodyToFlux(Map.class) 的 unchecked 转换警告。
+            List<Map<String, Object>> tools = webClient.get()
                     .uri("/api/v1/tools/{layer}", layer)
                     .retrieve()
-                    .bodyToFlux(Map.class)
-                    .collectList()
+                    .bodyToMono(new ParameterizedTypeReference<List<Map<String, Object>>>() {})
                     .block();
             return tools != null ? tools : Collections.emptyList();
         } catch (Exception e) {
