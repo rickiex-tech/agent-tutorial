@@ -19,10 +19,17 @@
 智能体 (MCP client)
   │  只看到少量高层工具，而非底层 300+ API
   ▼
-业务编排工具层  CustomerServiceTicketTool.createCustomerServiceTicket
-  │  串行：查询用户 → 查询运单 → 创建工单，强前置校验、失败即终止
+业务编排工具层（implements BusinessTool）
+  ├─ TrackShipmentTool.trackShipment（查件：只需运单 ID）
+  ├─ ExpediteShipmentTool.expediteShipment（催件：用户→运单→状态校验→工单）
+  └─ CustomerServiceTicketTool.createCustomerServiceTicket（建工单：用户→运单→工单）
+     串行编排，强前置校验、失败即终止
   ▼
-领域工具层  UserDomainTools / ShipmentDomainTools / TicketDomainTools   （按业务域封装，mock 数据）
+领域工具层（implements BusinessTool，按业务域封装，mock 数据）
+  ├─ UserDomainTools / ShipmentDomainTools / TicketDomainTools
+  ▼
+数据工具层（implements DataTool）
+  └─ DataDomainTools.getOrderMetrics（运营指标查询）
   ▼
 （真实环境）API Gateway → 既有微服务 200+ 业务 API
 ```
@@ -34,6 +41,11 @@
   - `BUSINESS_FAILURE`（用户/运单不存在）→ 终止，不重试
   - `SYSTEM_FAILURE`（超时/上游不可用）→ 可重试（`isRetryable()`）
 - **串行编排 + 失败即终止**：任意一步未成功，立即返回该步骤失败结果，不执行后续步骤
+- **标记接口自动扫描**：业务工具实现 [`BusinessTool`](src/main/java/com/logistics/mcp/tools/BusinessTool.java)、
+  数据工具实现 [`DataTool`](src/main/java/com/logistics/mcp/tools/DataTool.java)，Spring 自动注入 `List<BusinessTool>` / `List<DataTool>`，
+  无需在 `@Bean` 方法中手动声明。新增工具只需实现接口 + `@Service` + `@Tool`。
+- **工具暴露开关** [`ToolExposureProperties`](src/main/java/com/logistics/mcp/ToolExposureProperties.java)：
+  通过 `logistics.mcp.tools.business-enabled` / `data-enabled` 控制分组暴露，支持按 profile 独立部署。
 
 ## 治理层与可观测性（PoC 近似实现）
 
@@ -53,12 +65,15 @@ MCP Server 暴露**两层工具**给智能体（MCP client）：
 
 | 工具 | 职责 | 签名 | 响应 |
 |------|------|------|------|
-| **createCustomerServiceTicket** | 编排流程：查询用户 → 查询运单 → 创建工单，强前置校验、失败即终止 | `(userId: long, shipmentId: long, content: String) -> Ticket` | `ToolResult<Ticket>` |
+| **trackShipment** | 查件：查询运单状态与路由，无需用户身份验证 | `(shipmentId: long) -> Shipment` | `ToolResult<Shipment>` |
+| **expediteShipment** | 催件：查询用户 → 查询运单 → 校验状态白名单 → 创建催件工单 | `(userId, shipmentId, content) -> Ticket` | `ToolResult<Ticket>` |
+| **createCustomerServiceTicket** | 建工单：查询用户 → 查询运单 → 创建客服工单，强前置校验、失败即终止 | `(userId: long, shipmentId: long, content: String) -> Ticket` | `ToolResult<Ticket>` |
 
 **设计点**：
-- 智能体只需调用这一个工具，无需自行拼装三个底层工具或处理中间失败。
-- 工具内部实现串行逻辑 + 失败即终止（[源码](src/main/java/com/logistics/mcp/tools/composite/CustomerServiceTicketTool.java)）。
+- 智能体只需调用一个高层工具，无需自行拼装底层领域工具或处理中间失败。
+- 工具内部实现串行逻辑 + 失败即终止（源码：[TrackShipmentTool](src/main/java/com/logistics/mcp/tools/composite/TrackShipmentTool.java) / [ExpediteShipmentTool](src/main/java/com/logistics/mcp/tools/composite/ExpediteShipmentTool.java) / [CustomerServiceTicketTool](src/main/java/com/logistics/mcp/tools/composite/CustomerServiceTicketTool.java)）。
 - 任意一步失败时，立即返回该步骤的失败结果（包括错误码、错误分类、重试标记）。
+- 催件工具有状态白名单（`EXPEDITABLE_STATUSES`）：待取件、运输中、派送中、异常件可催件；已签收、已退回不可催件。
 
 #### 2️⃣ 领域工具（Domain）
 
@@ -68,12 +83,20 @@ MCP Server 暴露**两层工具**给智能体（MCP client）：
 |------|------|------|------|----------|
 | **getUser** | 用户域 | 查询用户信息 | `(userId: long) -> User` | 用户不存在：`BUSINESS_FAILURE`；用户服务超时（ID=1500）：`SYSTEM_FAILURE` |
 | **getShipment** | 运单域 | 查询运单信息 | `(shipmentId: long) -> Shipment` | 运单不存在：`BUSINESS_FAILURE` |
-| **createTicket** | 客服域 | 创建工单 | `(userId, shipmentId, content) -> Ticket` | 工单服务不可用（userId=1002）：`SYSTEM_FAILURE` |
+| **createTicket** | 客服域 | 创建工单 | `(userId, shipmentId, content, ticketType) -> Ticket` | 工单服务不可用（userId=1002）：`SYSTEM_FAILURE` |
 
 **设计点**：
 - 每个工具对接一个既有微服务的 API（示例见工具注释 `对接 GET /api/v1/xxx`）。
 - Mock 数据层（[MockData](src/main/java/com/logistics/mcp/tools/domain/MockData.java)）模拟既有数据库和服务行为。
 - 真实环境中仅需替换 Mock → 真实 HTTP 调用，工具接口和失败语义保持不变。
+
+#### 3️⃣ 数据工具（Data）
+
+| 工具 | 职责 | 签名 | 响应 |
+|------|------|------|------|
+| **getOrderMetrics** | 查询运营指标（订单量、履约率等） | `(period: String) -> OrderMetrics` | `ToolResult<OrderMetrics>` |
+
+数据工具实现 `DataTool` 标记接口，受 `data-enabled` 开关控制，可独立部署为数据域 MCP（`data` profile，端口 8082）。
 
 ### 响应格式（ToolResult）
 
@@ -134,23 +157,32 @@ public record ToolResult<T>(
 
 ### 编排模式：串行 + 失败即终止
 
-[CustomerServiceTicketTool](src/main/java/com/logistics/mcp/tools/composite/CustomerServiceTicketTool.java) 展示核心模式：
+[ExpediteShipmentTool](src/main/java/com/logistics/mcp/tools/composite/ExpediteShipmentTool.java) 展示核心模式：
 
 ```java
 // 步骤 1：查询用户，失败即返回
-ToolResult<User> userResult = userDomainTools.getUser(userId);
+ToolResult<User> userResult = retryExecutor.execute("get_user",
+        () -> userDomainTools.getUser(userId));
 if (!userResult.isSuccess()) {
-    return userResult.propagateFailure("查询用户信息失败: ");  // 包含步骤前缀，直接返回
+    return userResult.propagateFailure("查询用户信息失败: ");
 }
 
 // 步骤 2：查询运单，失败即返回
-ToolResult<Shipment> shipmentResult = shipmentDomainTools.getShipment(shipmentId);
+ToolResult<Shipment> shipmentResult = retryExecutor.execute("get_shipment",
+        () -> shipmentDomainTools.getShipment(shipmentId));
 if (!shipmentResult.isSuccess()) {
-    return shipmentResult.propagateFailure("查询运单信息失败: ");  // 同样立即返回
+    return shipmentResult.propagateFailure("查询运单信息失败: ");
 }
 
-// 步骤 3：创建工单
-ToolResult<Ticket> ticketResult = ticketDomainTools.createTicket(...);
+// 步骤 3：校验运单状态（白名单），不通过返回业务失败
+ShipmentStatus status = shipmentResult.data().status();
+if (!EXPEDITABLE_STATUSES.contains(status)) {
+    return ToolResult.businessFailure(40001, "运单状态不支持催件: " + status);
+}
+
+// 步骤 4：创建催件工单
+ToolResult<Ticket> ticketResult = retryExecutor.execute("create_ticket",
+        () -> ticketDomainTools.createTicket(userId, shipmentId, content, TicketType.EXPEDITE));
 // ...
 ```
 
@@ -189,6 +221,9 @@ mvn spring-boot:run -Dspring-boot.run.profiles=data
 | 用户查询失败 | user=1500 | SYSTEM_FAILURE，终止，可重试 |
 | 运单不存在 | user=1001, shipment=9999 | BUSINESS_FAILURE，终止，不重试 |
 | 创建工单失败 | user=1002, shipment=9002 | SYSTEM_FAILURE，报错 |
+| 催件状态白名单 | user=1001, shipment=9004（RETURNED） | BUSINESS_FAILURE，状态不支持催件 |
+| 查件成功 | shipment=9001 | SUCCESS，返回运单状态与路由 |
+| 查件运单不存在 | shipment=9999 | BUSINESS_FAILURE，终止 |
 
 ## OpenAPI 契约与 CI
 
