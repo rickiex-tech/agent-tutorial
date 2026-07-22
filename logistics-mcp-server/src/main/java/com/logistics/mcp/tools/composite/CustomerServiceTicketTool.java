@@ -2,10 +2,12 @@ package com.logistics.mcp.tools.composite;
 
 import com.logistics.mcp.common.ToolResult;
 import com.logistics.mcp.common.SystemFailureRetryExecutor;
+import com.logistics.mcp.tools.BusinessTool;
 import com.logistics.mcp.tools.domain.Shipment;
 import com.logistics.mcp.tools.domain.ShipmentDomainTools;
 import com.logistics.mcp.tools.domain.Ticket;
 import com.logistics.mcp.tools.domain.TicketDomainTools;
+import com.logistics.mcp.tools.domain.TicketType;
 import com.logistics.mcp.tools.domain.User;
 import com.logistics.mcp.tools.domain.UserDomainTools;
 import org.springframework.ai.tool.annotation.Tool;
@@ -20,7 +22,7 @@ import org.springframework.stereotype.Service;
  * 智能体只需调用此单一工具，无需自行拼装三个底层工具。
  */
 @Service
-public class CustomerServiceTicketTool {
+public class CustomerServiceTicketTool implements BusinessTool {
 
     private final UserDomainTools userDomainTools;
     private final ShipmentDomainTools shipmentDomainTools;
@@ -59,7 +61,7 @@ public class CustomerServiceTicketTool {
 
         // 步骤 3：创建工单，失败则报错
         ToolResult<Ticket> ticketResult = retryExecutor.execute("create_ticket",
-            () -> ticketDomainTools.createTicket(userId, shipmentId, content));
+            () -> ticketDomainTools.createTicket(userId, shipmentId, content, TicketType.GENERAL));
         if (!ticketResult.isSuccess()) {
             return ticketResult.propagateFailure("创建工单失败: ");
         }

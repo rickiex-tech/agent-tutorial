@@ -1,13 +1,14 @@
 package com.logistics.mcp.tools.domain;
 
 import com.logistics.mcp.common.ToolResult;
+import com.logistics.mcp.tools.BusinessTool;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
 
 /** 用户域领域工具。 */
 @Service
-public class UserDomainTools {
+public class UserDomainTools implements BusinessTool {
 
     /** 查询用户信息。对接 GET /api/v1/users/{userId}。 */
     @Tool(description = "查询用户信息，对接用户域微服务 GET /api/v1/users/{userId}")

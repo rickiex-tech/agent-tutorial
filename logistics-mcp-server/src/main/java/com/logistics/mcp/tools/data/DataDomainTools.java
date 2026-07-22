@@ -1,6 +1,7 @@
 package com.logistics.mcp.tools.data;
 
 import com.logistics.mcp.common.ToolResult;
+import com.logistics.mcp.tools.DataTool;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Service;
@@ -9,7 +10,7 @@ import org.springframework.stereotype.Service;
  * 数据域 MCP 工具骨架。
  */
 @Service
-public class DataDomainTools {
+public class DataDomainTools implements DataTool {
 
     @Tool(description = "查询运营指标（数据域工具层示例）")
     public ToolResult<OrderMetrics> queryOrderMetrics(

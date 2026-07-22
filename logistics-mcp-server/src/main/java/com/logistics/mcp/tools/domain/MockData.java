@@ -20,12 +20,17 @@ public final class MockData {
 
     public static final Map<Long, User> USERS = Map.of(
             1001L, new User(1001L, "张三", "138****0001", "VIP"),
-            1002L, new User(1002L, "李四", "139****0002", "NORMAL")
+            1002L, new User(1002L, "李四", "139****0002", "NORMAL"),
+            1003L, new User(1003L, "王五", "137****0003", "NORMAL")
     );
 
     public static final Map<Long, Shipment> SHIPMENTS = Map.of(
-            9001L, new Shipment(9001L, 1001L, "IN_TRANSIT", "北京→上海"),
-            9002L, new Shipment(9002L, 1002L, "DELIVERED", "广州→深圳")
+            9001L, new Shipment(9001L, 1001L, ShipmentStatus.IN_TRANSIT,       "北京→上海"),
+            9002L, new Shipment(9002L, 1003L, ShipmentStatus.DELIVERED,        "广州→深圳"),
+            9003L, new Shipment(9003L, 1001L, ShipmentStatus.PENDING_PICKUP,   "上海→杭州"),
+            9004L, new Shipment(9004L, 1001L, ShipmentStatus.RETURNED,         "北京→天津"),
+            9005L, new Shipment(9005L, 1003L, ShipmentStatus.OUT_FOR_DELIVERY, "深圳→广州"),
+            9006L, new Shipment(9006L, 1003L, ShipmentStatus.EXCEPTION,        "成都→重庆")
     );
 
     public static final AtomicLong TICKET_SEQ = new AtomicLong(70000L);

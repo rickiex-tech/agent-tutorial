@@ -5,6 +5,7 @@ import com.logistics.mcp.common.ToolResult;
 import com.logistics.mcp.tools.domain.ShipmentDomainTools;
 import com.logistics.mcp.tools.domain.Ticket;
 import com.logistics.mcp.tools.domain.TicketDomainTools;
+import com.logistics.mcp.tools.domain.TicketType;
 import com.logistics.mcp.tools.domain.UserDomainTools;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,7 @@ class CustomerServiceTicketToolTest {
         assertTrue(result.data().ticketId() > 0);
         assertEquals(1001L, result.data().userId());
         assertEquals(9001L, result.data().shipmentId());
+        assertEquals(TicketType.GENERAL, result.data().ticketType());
     }
 
     @Test

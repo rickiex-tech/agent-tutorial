@@ -58,3 +58,168 @@ Content-Type: application/json
   "roles": "agent-user",
   "message": "帮我查一下用户1001的运单9001现在到哪了"
 }
+
+### ============================================================
+### 查件（trackShipment）测试用例
+### 工具只需运单 ID，无需用户身份验证
+### ============================================================
+
+### T1) 查件成功：运单 9001（IN_TRANSIT，北京→上海）
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "sessionId": "sess-track-9001",
+  "userId": 1001,
+  "roles": "agent-user",
+  "message": "帮我查一下运单9001现在到哪了"
+}
+
+### T2) 查件成功：运单 9003（PENDING_PICKUP，上海→杭州）
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "sessionId": "sess-track-9003",
+  "userId": 1001,
+  "roles": "agent-user",
+  "message": "运单9003的物流进度怎么样了？"
+}
+
+### T3) 查件成功：运单 9005（OUT_FOR_DELIVERY，深圳→广州）
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "sessionId": "sess-track-9005",
+  "userId": 1002,
+  "roles": "agent-user",
+  "message": "我的运单9005现在到哪了？"
+}
+
+### T4) 查件成功：运单 9006（EXCEPTION，成都→重庆）
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "sessionId": "sess-track-9006",
+  "userId": 1002,
+  "roles": "agent-user",
+  "message": "能帮我查一下运单9006的状态吗？"
+}
+
+### T5) 查件业务失败：运单 9999 不存在 → 解释并引导核对，不重试
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "sessionId": "sess-track-9999",
+  "userId": 1001,
+  "roles": "agent-user",
+  "message": "帮我查一下运单9999到哪了"
+}
+
+### ============================================================
+### 催件（expediteShipment）测试用例
+### 工具需要用户 ID + 运单 ID + 催件原因
+### 允许催件的状态：待取件、运输中、派送中、异常件
+### ============================================================
+
+### E1) 催件成功：用户 1001 + 运单 9001（IN_TRANSIT）→ 创建催件工单
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "sessionId": "sess-expedite-9001",
+  "userId": 1001,
+  "roles": "agent-user",
+  "message": "运单9001太慢了，帮我加急一下"
+}
+
+### E2) 催件成功：用户 1001 + 运单 9003（PENDING_PICKUP）→ 创建催件工单
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "sessionId": "sess-expedite-9003",
+  "userId": 1001,
+  "roles": "agent-user",
+  "message": "我的运单9003还没取件，我要催一下"
+}
+
+### E3) 催件成功：用户 1003 + 运单 9005（OUT_FOR_DELIVERY）→ 创建催件工单
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "sessionId": "sess-expedite-9005",
+  "userId": 1003,
+  "roles": "agent-user",
+  "message": "运单9005派送太慢了，能加急处理吗"
+}
+
+### E4) 催件成功：用户 1003 + 运单 9006（EXCEPTION）→ 创建催件工单
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "sessionId": "sess-expedite-9006",
+  "userId": 1003,
+  "roles": "agent-user",
+  "message": "运单9006变成异常件了，我要加急处理"
+}
+
+### E5) 催件业务失败：用户 1001 + 运单 9999 不存在 → 解释并引导核对
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "sessionId": "sess-expedite-9999",
+  "userId": 1001,
+  "roles": "agent-user",
+  "message": "帮我催一下运单9999"
+}
+
+### E6) 催件业务失败：用户 1003 + 运单 9002（DELIVERED 已签收）→ 状态不支持催件
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "sessionId": "sess-expedite-9002",
+  "userId": 1003,
+  "roles": "agent-user",
+  "message": "运单9002我要加急"
+}
+
+### E7) 催件业务失败：用户 1001 + 运单 9004（RETURNED 已退回）→ 状态不支持催件
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "sessionId": "sess-expedite-9004",
+  "userId": 1001,
+  "roles": "agent-user",
+  "message": "帮我催一下运单9004"
+}
+
+### E8) 催件系统失败：用户 1500（用户服务超时）+ 运单 9001 → "系统繁忙，请稍后重试"
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "sessionId": "sess-expedite-1500",
+  "userId": 1500,
+  "roles": "agent-user",
+  "message": "用户1500的运单9001太慢了，帮我加急"
+}
+
+### E9) 催件系统失败：用户 1002（工单服务不可用）+ 运单 9005 → "系统繁忙，请稍后重试"
+POST {{host}}/api/v1/agent/chat
+Content-Type: application/json
+
+{
+  "sessionId": "sess-expedite-1002-9005",
+  "userId": 1002,
+  "roles": "agent-user",
+  "message": "用户1002的运单9005派送太慢，帮我加急处理"
+}
