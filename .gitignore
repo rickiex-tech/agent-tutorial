@@ -1,6 +1,11 @@
 # macOS
 .DS_Store
 
+# Environment variables (prevent accidental credential leaks)
+.env
+.env.local
+.env.*.local
+
 # Java / Maven
 target/
 *.class

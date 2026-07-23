@@ -8,13 +8,13 @@ Define the customer service ticket creation composite tool as a reference implem
 
 ### Requirement: 客服工单创建业务编排工具
 
-系统 MUST 提供业务编排工具 `create_customer_service_ticket`，按固定串行顺序执行：查询用户信息 → 查询运单信息 → 创建工单，并具备强前置校验、失败即终止的语义。
+系统 MUST 提供业务编排工具 `create_customer_service_ticket`，按固定串行顺序执行：查询用户信息 → 查询运单信息 → 创建工单，并具备强前置校验、失败即终止的语义。创建的工单 MUST 携带 `ticketType` 字段，值为 `GENERAL`。
 
 #### Scenario: 正常路径成功创建工单
 
 - **GIVEN** 用户信息存在且运单信息存在
 - **WHEN** 调用 `create_customer_service_ticket(userId, shipmentId, content)`
-- **THEN** 系统依次查询用户信息、查询运单信息、创建工单，并返回工单号 `ticketId`
+- **THEN** 系统依次查询用户信息、查询运单信息、创建 `ticketType=GENERAL` 的工单，并返回工单号 `ticketId`
 
 #### Scenario: 用户信息查询失败则终止
 
